@@ -1,0 +1,3 @@
+/.llmero/
+profiles/*.local.env
+models/
