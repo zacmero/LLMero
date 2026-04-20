@@ -10,7 +10,7 @@ BACKEND_MODE="${BACKEND_MODE:-auto}"
 SKIP_DEPS="${SKIP_DEPS:-0}"
 JOBS="${JOBS:-2}"
 CUDA_HOME="${CUDA_HOME:-}"
-LLAMA_BUILD_TARGET="${LLAMA_BUILD_TARGET:-llama-cli}"
+LLAMA_BUILD_TARGETS="${LLAMA_BUILD_TARGETS:-${LLAMA_BUILD_TARGET:-llama-cli}}"
 
 PROFILE_DIR="$ROOT_DIR/profiles"
 
@@ -38,7 +38,7 @@ Options:
   --repo URL            llama.cpp git repository URL
   --ref REF             llama.cpp git ref or branch (default: master)
   --skip-deps           Do not install system packages
-  --target TARGET       CMake target to build (default: llama-cli)
+  --target TARGETS      Space-separated CMake targets to build (default: llama-cli)
   -h, --help            Show this help
 EOF
 }
@@ -58,7 +58,7 @@ while [ $# -gt 0 ]; do
     --skip-deps)
       SKIP_DEPS=1; shift ;;
     --target)
-      LLAMA_BUILD_TARGET="${2:-}"; shift 2 ;;
+      LLAMA_BUILD_TARGETS="${2:-}"; shift 2 ;;
     -h|--help)
       usage; exit 0 ;;
     *)
@@ -70,7 +70,7 @@ refresh_profile_paths() {
   PROFILE_FILE="$PROFILE_DIR/$PROFILE_NAME.env"
   PROFILE_EXAMPLE="$PROFILE_DIR/$PROFILE_NAME.env.example"
   STATE_DIR="$PREFIX_DIR/state/$PROFILE_NAME"
-  SRC_DIR="$PREFIX_DIR/src/llama.cpp"
+  SRC_DIR="${LLAMA_SRC_DIR:-$PREFIX_DIR/src/$PROFILE_NAME/llama.cpp}"
 }
 
 refresh_profile_paths
@@ -321,8 +321,17 @@ build_llama() {
   log "configuring llama.cpp for $backend_name"
   cmake "${cmake_args[@]}"
 
-  log "building llama.cpp target: $LLAMA_BUILD_TARGET"
-  cmake --build "$build_dir" --config Release --target "$LLAMA_BUILD_TARGET" -j"$JOBS"
+  local build_targets=()
+  read -r -a build_targets <<<"$LLAMA_BUILD_TARGETS"
+  if [ "${#build_targets[@]}" -eq 0 ]; then
+    die "no CMake build targets requested"
+  fi
+
+  local target
+  for target in "${build_targets[@]}"; do
+    log "building llama.cpp target: $target"
+    cmake --build "$build_dir" --config Release --target "$target" -j"$JOBS"
+  done
 
   log "installing built runtime files to $install_dir"
   cmake --install "$build_dir" --component Runtime || warn "runtime install step failed; using build directory binaries"
@@ -334,9 +343,12 @@ LLAMERO_INSTALL_DIR="$install_dir"
 LLAMERO_BUILD_DIR="$build_dir"
 LLAMERO_BIN_DIR="$build_dir/bin"
 LLAMERO_LLAMA_CLI="$build_dir/bin/llama-cli"
+LLAMERO_LLAMA_SERVER="$build_dir/bin/llama-server"
+LLAMERO_LLAMA_MTMD_CLI="$build_dir/bin/llama-mtmd-cli"
 LLAMERO_MODEL_ROOT="${MODEL_ROOT:-$ROOT_DIR/models/$PROFILE_NAME}"
 LLAMERO_RUN_ROOT="${RUN_ROOT:-$ROOT_DIR/$PROFILE_NAME}"
 LLAMERO_EXTRA_ARGS="${LLAMA_EXTRA_ARGS:-}"
+LLAMERO_LD_LIBRARY_PATH="$build_dir/bin"
 EOF
 
   log "wrote runtime state: $STATE_DIR/runtime.env"

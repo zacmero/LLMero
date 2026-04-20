@@ -1,13 +1,85 @@
-# LLMero Setup
+# LLMero
 
-This repo now ships a hardware-aware `install.sh` that can:
+Local AI setup repo for running project-specific `llama.cpp` builds across:
 
-- Install the basic build dependencies on Arch or Ubuntu/Debian.
-- Build `llama.cpp` in CPU mode for cloud VMs with no NVIDIA stack.
-- Build `llama.cpp` in CUDA mode on NVIDIA machines when `nvcc` is available and supports the detected GPU architecture.
-- Keep per-project runtime state under `./.llmero/state/<profile>/`.
+- Local Arch Linux machine with NVIDIA CUDA.
+- CPU-only Ubuntu/cloud VM.
+- Multiple model profiles with OpenAI-compatible APIs.
 
-## Quick Start
+Validated local profiles:
+
+- `llmero-bonsai`: fast text-only Bonsai 8B GGUF.
+- `llmero-gemma4`: Gemma 4 E4B multimodal GGUF with text + image support.
+
+Generated source/build files live under `.llmero/`. Model weights live under `models/`.
+
+## Current Local Status
+
+Gemma 4 is validated locally on the GTX 1060 6GB:
+
+- Model: `ggml-org/gemma-4-E4B-it-GGUF`
+- Text model: `gemma-4-E4B-it-Q4_K_M.gguf`
+- Multimodal projector: `mmproj-gemma-4-E4B-it-Q8_0.gguf`
+- API server: `http://127.0.0.1:8082/v1`
+- Model alias: `gemma-4-e4b`
+- Thinking mode: enabled
+- Text test speed: about `27 tok/s`
+- Image test speed: about `26.8 tok/s`
+- GPU memory while serving: about `4.3G / 6G`
+
+## Clone
+
+Replace the URL with your GitHub repo URL:
+
+```bash
+git clone <your-github-repo-url> LLMero
+cd LLMero
+```
+
+## Install Build Dependencies
+
+Arch:
+
+```bash
+sudo pacman -S --needed git base-devel cmake
+```
+
+Ubuntu/Debian:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git build-essential cmake python3 python3-venv curl
+```
+
+## Local CUDA Build Notes
+
+This local machine uses a GTX 1060 6GB:
+
+- GPU architecture: Pascal
+- Compute capability: `6.1`
+- Required CUDA compiler arch: `compute_61`
+
+CUDA 13 does not compile `compute_61`. Use CUDA 12.9 from:
+
+```text
+/opt/cuda-12.9
+```
+
+Keep compile jobs low on this machine:
+
+```bash
+JOBS=1
+```
+
+`100C` is the CPU critical limit. Do not sustain builds there.
+
+## Install Bonsai
+
+CUDA:
+
+```bash
+JOBS=1 CUDA_HOME=/opt/cuda-12.9 ./install.sh --profile llmero-bonsai --backend cuda --skip-deps
+```
 
 CPU-only VM:
 
@@ -15,42 +87,13 @@ CPU-only VM:
 ./install.sh --profile llmero-bonsai --backend cpu
 ```
 
-Auto-detect mode:
+Download model:
 
 ```bash
-./install.sh
+./scripts/download-model.sh llmero-bonsai
 ```
 
-Specific profile:
-
-```bash
-./install.sh --profile llmero-gemma4
-```
-
-Local CUDA Bonsai build on this GTX 1060 machine:
-
-```bash
-CUDA_HOME=/opt/cuda-12.9 \
-LLAMA_REPO_URL=https://github.com/PrismML-Eng/llama.cpp.git \
-./install.sh --profile llmero-bonsai --backend cuda --skip-deps
-```
-
-Use `JOBS=1` if the CPU starts approaching 90C during compilation.
-
-## Profile Files
-
-Starter profile templates live in `profiles/*.env.example`.
-Copy the matching example to `profiles/<name>.env` and edit it when the model-specific paths are known.
-
-The Bonsai profile currently points at:
-
-- Hugging Face repo: `prism-ml/Bonsai-8B-gguf`
-- Model file: `Bonsai-8B.gguf`
-- Local path: `models/llmero-bonsai/Bonsai-8B.gguf`
-
-## Run Bonsai
-
-CUDA one-shot command:
+Run one-shot test:
 
 ```bash
 LD_LIBRARY_PATH=.llmero/build/llmero-bonsai/cuda/bin:/opt/cuda-12.9/targets/x86_64-linux/lib \
@@ -62,30 +105,245 @@ LD_LIBRARY_PATH=.llmero/build/llmero-bonsai/cuda/bin:/opt/cuda-12.9/targets/x86_
   --single-turn --simple-io --no-display-prompt
 ```
 
-CPU-only command after a CPU build:
+## Install Gemma 4
+
+CUDA:
 
 ```bash
-.llmero/build/llmero-bonsai/cpu/bin/llama-cli \
-  -m models/llmero-bonsai/Bonsai-8B.gguf \
-  -p "Write one short sentence about bonsai trees." \
-  -n 32 -c 1024 \
-  --temp 0.5 --top-p 0.85 --top-k 20 \
-  --single-turn --simple-io --no-display-prompt
+JOBS=1 CUDA_HOME=/opt/cuda-12.9 ./install.sh --profile llmero-gemma4 --backend cuda --skip-deps
 ```
 
-## CUDA Build Note
-
-If the installer detects that `nvcc` does not support the detected GPU compute capability, it stops early with a clear error.
-That is the same class of failure as:
-
-`nvcc fatal : Unsupported gpu architecture 'compute_61'`
-
-On this local machine, the issue was the opposite of "too old": CUDA 13 no longer supports Pascal `compute_61`, while the GTX 1060 requires it. The working path is CUDA 12.9 from `/opt/cuda-12.9`.
-
-## Temperature Note
-
-100C on this CPU is the critical limit reported by `sensors`, not a safe sustained build temperature. Keep compile jobs low on this host:
+CPU-only VM:
 
 ```bash
-JOBS=1 ./install.sh --profile llmero-bonsai --backend cuda --skip-deps
+./install.sh --profile llmero-gemma4 --backend cpu
+```
+
+Download model + multimodal projector:
+
+```bash
+./scripts/download-model.sh llmero-gemma4
+```
+
+Expected files:
+
+```text
+models/llmero-gemma4/gemma-4-E4B-it-Q4_K_M.gguf
+models/llmero-gemma4/mmproj-gemma-4-E4B-it-Q8_0.gguf
+```
+
+## Start OpenAI-Compatible API
+
+Bonsai:
+
+```bash
+./scripts/serve.sh llmero-bonsai
+```
+
+Gemma 4:
+
+```bash
+./scripts/serve.sh llmero-gemma4
+```
+
+Gemma listens at:
+
+```text
+http://127.0.0.1:8082/v1
+```
+
+Use it from OpenAI-compatible frameworks with:
+
+```bash
+export OPENAI_API_KEY=local
+export OPENAI_BASE_URL=http://127.0.0.1:8082/v1
+export OPENAI_MODEL=gemma-4-e4b
+```
+
+## Test Gemma Text API
+
+Thinking mode is enabled, so use a larger token budget:
+
+```bash
+MAX_TOKENS=512 ./scripts/test-openai.sh \
+  llmero-gemma4 \
+  "Think briefly, then answer: in one paragraph, what are your strongest local capabilities for my automation workflows?"
+```
+
+Raw curl equivalent:
+
+```bash
+curl http://127.0.0.1:8082/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemma-4-e4b",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Think briefly, then answer in one paragraph: what are your strongest local capabilities?"
+      }
+    ],
+    "max_tokens": 512
+  }'
+```
+
+The response includes:
+
+- `message.reasoning_content`
+- `message.content`
+
+## Test Gemma Image API
+
+Default test image:
+
+```bash
+MAX_TOKENS=768 ./scripts/test-openai-image.sh llmero-gemma4
+```
+
+Custom image URL:
+
+```bash
+MAX_TOKENS=768 ./scripts/test-openai-image.sh \
+  llmero-gemma4 \
+  "https://example.com/image.png" \
+  "Describe this image and identify anything actionable."
+```
+
+Raw curl equivalent:
+
+```bash
+curl http://127.0.0.1:8082/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemma-4-e4b",
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Describe this image in one concise paragraph."
+          },
+          {
+            "type": "image_url",
+            "image_url": {
+              "url": "https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/cats.png"
+            }
+          }
+        ]
+      }
+    ],
+    "max_tokens": 768
+  }'
+```
+
+## Runtime Checks
+
+Check server process:
+
+```bash
+pgrep -af 'llama-server|serve.sh'
+```
+
+Check GPU usage:
+
+```bash
+nvidia-smi
+```
+
+Check CPU temperatures:
+
+```bash
+sensors
+```
+
+Check runtime state:
+
+```bash
+cat .llmero/state/llmero-gemma4/runtime.env
+```
+
+## Useful Paths
+
+Gemma binaries:
+
+```text
+.llmero/build/llmero-gemma4/cuda/bin/llama-cli
+.llmero/build/llmero-gemma4/cuda/bin/llama-server
+.llmero/build/llmero-gemma4/cuda/bin/llama-mtmd-cli
+```
+
+Gemma model files:
+
+```text
+models/llmero-gemma4/gemma-4-E4B-it-Q4_K_M.gguf
+models/llmero-gemma4/mmproj-gemma-4-E4B-it-Q8_0.gguf
+```
+
+Bonsai model file:
+
+```text
+models/llmero-bonsai/Bonsai-8B.gguf
+```
+
+## Troubleshooting
+
+### `Unsupported gpu architecture 'compute_61'`
+
+The CUDA compiler does not support the requested GPU architecture.
+
+For GTX 1060:
+
+- CUDA 13: does not work for compiling `compute_61`
+- CUDA 12.9: works
+
+Use:
+
+```bash
+CUDA_HOME=/opt/cuda-12.9 ./install.sh --profile llmero-gemma4 --backend cuda --skip-deps
+```
+
+### API Test Cannot Connect
+
+If curl cannot connect from this Codex environment but the server is running, it may be a sandbox network namespace issue. Run the command in your terminal, or run with host permissions.
+
+Check server:
+
+```bash
+pgrep -af 'llama-server|serve.sh'
+```
+
+### Model Thinks But Does Not Answer
+
+Gemma thinking mode can consume many tokens. Increase token budget:
+
+```bash
+MAX_TOKENS=1024 ./scripts/test-openai.sh llmero-gemma4 "Your prompt here"
+```
+
+If you want direct responses for a fast workflow, edit `profiles/llmero-gemma4.env` and change:
+
+```bash
+--reasoning on
+```
+
+to:
+
+```bash
+--reasoning off
+```
+
+Then restart:
+
+```bash
+pkill -f llama-server
+./scripts/serve.sh llmero-gemma4
+```
+
+### VM Has No CUDA
+
+Use CPU mode:
+
+```bash
+./install.sh --profile llmero-gemma4 --backend cpu
 ```

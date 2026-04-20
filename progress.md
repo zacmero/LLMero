@@ -30,3 +30,21 @@
 - Verified the file is GGUF v3 and recorded SHA256 `284a335aa3fb2ced3b1b01fcb40b08aa783e3b70832767f0dd2e3fdfa134bd54`.
 - Built `llama-cli` successfully at `.llmero/build/llmero-bonsai/cuda/bin/llama-cli`.
 - Ran a CUDA inference test outside the sandbox. llama.cpp found the GTX 1060, generated one sentence, and reported about 31.9 tokens/sec generation speed.
+
+## Server Refactor Start
+
+- User approved the profile/server architecture refactor and requested Gemma 4 4B-class model specifically.
+- Confirmed current repo has only a concrete Bonsai profile; Gemma profile is an example placeholder.
+- Confirmed upstream llama.cpp supports Gemma 4 multimodal through `llama-server` and OpenAI-compatible `/v1/chat/completions`.
+- Selected `ggml-org/gemma-4-E4B-it-GGUF` as the first Gemma 4 profile target, with Q4_K_M text model plus f16 multimodal projector.
+- Added profile-driven scripts for model download, OpenAI-compatible server startup, and text API smoke testing.
+- Updated profiles so Bonsai uses the PrismML llama.cpp fork and Gemma 4 uses upstream `ggml-org/llama.cpp`.
+- Changed the installer source checkout path to be per-profile, preventing Bonsai and Gemma from fighting over one shared llama.cpp source tree.
+- Built Gemma profile targets successfully with CUDA 12.9: `llama-cli`, `llama-server`, and `llama-mtmd-cli`.
+- Downloaded Gemma 4 E4B model files to `models/llmero-gemma4`: `gemma-4-E4B-it-Q4_K_M.gguf` and `mmproj-gemma-4-E4B-it-Q8_0.gguf`.
+- Confirmed final build artifacts in `.llmero/build/llmero-gemma4/cuda/bin/` and runtime state in `.llmero/state/llmero-gemma4/runtime.env`.
+- Started Gemma 4 OpenAI-compatible server on port 8082 and confirmed model/projector loading.
+- Re-enabled Gemma reasoning mode after user clarified token spending is acceptable for local AI and quality is the priority.
+- Validated text `/v1/chat/completions` with thinking enabled using `MAX_TOKENS=512`.
+- Added and validated image OpenAI-compatible API test helper with `MAX_TOKENS=768`.
+- Updated README with the complete install, serve, text API, and image API workflow.

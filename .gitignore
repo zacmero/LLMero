@@ -1,3 +1,4 @@
 /.llmero/
+.venv/
 profiles/*.local.env
 models/
