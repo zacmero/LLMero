@@ -293,6 +293,17 @@ build_llama() {
 
   mkdir -p "$build_dir" "$install_dir" "$STATE_DIR"
 
+  local cache_file="$build_dir/CMakeCache.txt"
+  if [ -f "$cache_file" ]; then
+    local cached_source
+    cached_source="$(sed -n 's/^CMAKE_HOME_DIRECTORY:INTERNAL=//p' "$cache_file" | tail -n 1)"
+    if [ -n "$cached_source" ] && [ "$cached_source" != "$SRC_DIR" ]; then
+      warn "build cache points at $cached_source; reconfiguring for $SRC_DIR"
+      rm -f "$cache_file"
+      rm -rf "$build_dir/CMakeFiles"
+    fi
+  fi
+
   local cmake_args=(
     -S "$SRC_DIR"
     -B "$build_dir"
