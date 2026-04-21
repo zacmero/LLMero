@@ -160,6 +160,8 @@ export OPENAI_BASE_URL=http://127.0.0.1:8082/v1
 export OPENAI_MODEL=gemma-4-e4b
 ```
 
+See also: [n8n integration guide](docs/n8n.md)
+
 ## Test Gemma Text API
 
 Thinking mode is enabled, so use a larger token budget:
