@@ -84,18 +84,59 @@ For Gemma image input, send `content` as an array with `text` and `image_url` pa
 
 The model should stay in serving mode.
 
-Run the server once:
+For manual testing, run a server in the foreground:
 
 ```bash
 ./scripts/serve.sh llmero-gemma4
 ./scripts/serve.sh llmero-bonsai
 ```
 
-Then point n8n to the correct endpoint for each workflow.
+The foreground command keeps the terminal occupied. Stop it with `Ctrl+C`.
+
+For n8n, use user systemd services so the APIs keep running after the terminal command exits.
+
+Start Gemma 4:
+
+```bash
+systemd-run --user --unit=llmero-gemma4 \
+  --working-directory=/home/zacmero/projects/LLMero \
+  /home/zacmero/projects/LLMero/scripts/serve.sh llmero-gemma4
+```
+
+Start Bonsai:
+
+```bash
+systemd-run --user --unit=llmero-bonsai \
+  --working-directory=/home/zacmero/projects/LLMero \
+  /home/zacmero/projects/LLMero/scripts/serve.sh llmero-bonsai
+```
+
+Check status:
+
+```bash
+systemctl --user status llmero-gemma4 --no-pager
+systemctl --user status llmero-bonsai --no-pager
+```
+
+Stop services:
+
+```bash
+systemctl --user stop llmero-gemma4
+systemctl --user stop llmero-bonsai
+```
+
+Check listening ports:
+
+```bash
+ss -ltnp sport = :8082
+ss -ltnp sport = :8081
+```
+
+Then point n8n to the correct endpoint for each workflow. If `serve.sh` says it cannot bind the socket, the model is already running on that port.
 
 ## Notes
 
 - The WebUI `systemMessage` is a UI setting, not something n8n uses unless you send it.
 - Conversations in the WebUI are browser-side state.
 - The API only sees what your workflow sends in the request body.
-
+- `systemd-run` creates transient user services. They survive terminal exit, but they are not permanent boot services.

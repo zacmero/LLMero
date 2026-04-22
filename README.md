@@ -134,30 +134,75 @@ models/llmero-gemma4/mmproj-gemma-4-E4B-it-Q8_0.gguf
 
 ## Start OpenAI-Compatible API
 
-Bonsai:
+Use foreground mode when you want to watch logs in the current terminal. The command keeps running until you stop it with `Ctrl+C`.
+
+Bonsai foreground:
 
 ```bash
 ./scripts/serve.sh llmero-bonsai
 ```
 
-Gemma 4:
+Gemma 4 foreground:
 
 ```bash
 ./scripts/serve.sh llmero-gemma4
 ```
 
-Gemma listens at:
+For normal workflow use, start each model as a user systemd service. This keeps the API running after the terminal command exits.
 
-```text
-http://127.0.0.1:8082/v1
+Bonsai background service:
+
+```bash
+systemd-run --user --unit=llmero-bonsai \
+  --working-directory=/home/zacmero/projects/LLMero \
+  /home/zacmero/projects/LLMero/scripts/serve.sh llmero-bonsai
 ```
 
-Use it from OpenAI-compatible frameworks with:
+Gemma 4 background service:
+
+```bash
+systemd-run --user --unit=llmero-gemma4 \
+  --working-directory=/home/zacmero/projects/LLMero \
+  /home/zacmero/projects/LLMero/scripts/serve.sh llmero-gemma4
+```
+
+Check service status:
+
+```bash
+systemctl --user status llmero-bonsai --no-pager
+systemctl --user status llmero-gemma4 --no-pager
+```
+
+Stop services:
+
+```bash
+systemctl --user stop llmero-bonsai
+systemctl --user stop llmero-gemma4
+```
+
+If you see `couldn't bind HTTP server socket`, that port is already in use. Check the service status or stop the running service before starting another copy.
+
+Endpoints:
+
+```text
+Bonsai:  http://127.0.0.1:8081/v1
+Gemma 4: http://127.0.0.1:8082/v1
+```
+
+Use Gemma 4 from OpenAI-compatible frameworks with:
 
 ```bash
 export OPENAI_API_KEY=local
 export OPENAI_BASE_URL=http://127.0.0.1:8082/v1
 export OPENAI_MODEL=gemma-4-e4b
+```
+
+Use Bonsai with:
+
+```bash
+export OPENAI_API_KEY=local
+export OPENAI_BASE_URL=http://127.0.0.1:8081/v1
+export OPENAI_MODEL=bonsai-8b
 ```
 
 See also: [n8n integration guide](docs/n8n.md)
