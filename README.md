@@ -150,12 +150,26 @@ Gemma 4 foreground:
 
 For normal workflow use, start each model as a user systemd service. This keeps the API running after the terminal command exits.
 
+Important:
+
+- `llmero-bonsai` now binds the server to `0.0.0.0`
+- this is for Docker/container reachability
+- local access through `127.0.0.1:8081` still works exactly the same
+- only the bind interface changed, not the local URL you use from the machine itself
+
 Bonsai background service:
 
 ```bash
 systemd-run --user --unit=llmero-bonsai \
   --working-directory=/home/zacmero/projects/LLMero \
   /home/zacmero/projects/LLMero/scripts/serve.sh llmero-bonsai
+```
+
+Persistent Bonsai service:
+
+```bash
+systemctl --user status llmero-bonsai.service --no-pager
+systemctl --user restart llmero-bonsai.service
 ```
 
 Gemma 4 background service:
@@ -188,6 +202,8 @@ Endpoints:
 Bonsai:  http://127.0.0.1:8081/v1
 Gemma 4: http://127.0.0.1:8082/v1
 ```
+
+For container access on the same host, Bonsai is also reachable through the host bridge path used by Docker-based services such as n8n.
 
 Use Gemma 4 from OpenAI-compatible frameworks with:
 
